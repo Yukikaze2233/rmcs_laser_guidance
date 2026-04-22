@@ -66,12 +66,13 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (camera.connected())
-            std::ignore = camera.disconnect();
+        if (camera.connected()) {
+            auto disconnect_result = camera.disconnect();
+            (void)disconnect_result;
+        }
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "hikcamera_preview failed: " << e.what() << '\n';
         return 1;
     }
 }
-
