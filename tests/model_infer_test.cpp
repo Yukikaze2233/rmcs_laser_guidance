@@ -2,8 +2,8 @@
 #include <print>
 
 #include "config.hpp"
+#include "internal/model_infer.hpp"
 #include "internal/replay.hpp"
-#include "pipeline.hpp"
 #include "test_utils.hpp"
 
 int main() {
@@ -14,17 +14,36 @@ int main() {
         require(!dataset.frames.empty(), "sample dataset should not be empty");
 
         const auto frame = rmcs_laser_guidance::load_replay_frame(dataset, dataset.frames.front());
-        auto config      = rmcs_laser_guidance::load_config(default_config_path());
-        config.inference.backend    = rmcs_laser_guidance::InferenceBackendKind::model;
+        auto config = rmcs_laser_guidance::load_config(default_config_path());
+        config.inference.backend = rmcs_laser_guidance::InferenceBackendKind::model;
+
+        rmcs_laser_guidance::ModelInfer default_infer(config.inference);
+        const auto default_result = default_infer.infer(frame);
+        require(!default_result.success, "default model infer should not succeed");
+        require(!default_result.contract_supported, "default model infer should not support a contract");
+
+#if defined(RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME)
+        require(default_result.enabled, "onnxruntime-enabled build should report enabled");
+        require_contains(
+            default_result.message, "inference.model_path", "missing model path message");
+#else
+        require(!default_result.enabled, "default build should report model backend disabled");
+        require_contains(default_result.message, "ONNX Runtime", "build-disabled message");
+#endif
+
         config.inference.model_path = "models/mock_detector.onnx";
+        rmcs_laser_guidance::ModelInfer missing_model_infer(config.inference);
+        const auto missing_model_result = missing_model_infer.infer(frame);
+        require(!missing_model_result.success, "missing model path should not succeed");
+        require(!missing_model_result.contract_supported, "missing model should not support a contract");
 
-        rmcs_laser_guidance::Pipeline pipeline(config);
-        const auto observation = pipeline.process(frame);
-
-        require(!observation.detected, "model placeholder pipeline should not detect");
-        require_near(observation.center.x, -1.0F, 1e-3F, "model placeholder center.x");
-        require_near(observation.center.y, -1.0F, 1e-3F, "model placeholder center.y");
-        require_near(observation.brightness, 0.0F, 1e-3F, "model placeholder brightness");
+#if defined(RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME)
+        require_contains(
+            missing_model_result.message, "does not exist", "missing model file message");
+#else
+        require_contains(
+            missing_model_result.message, "ONNX Runtime", "build-disabled missing model message");
+#endif
 
         return 0;
     } catch (const std::exception& e) {

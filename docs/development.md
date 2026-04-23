@@ -70,3 +70,11 @@
 - pipeline 能稳定处理正常图像和异常输入
 - 自动测试与人工入口都存在
 - 核心逻辑不依赖 ROS 控制链
+
+## 当前模型接入约束
+
+- ONNX Runtime 依赖当前必须保持为可选构建，不要把默认构建改成强依赖。
+- 在没有真实模型契约前，不要提前把 `mean/std`、`NMS`、`class_names` 等模型专属配置写死进 public config。
+- `model` 后端当前允许扩展内部 `ModelRuntime` / `ModelAdapter`，但不要把这些内部类型提升到 public API。
+- 数据集生成相关能力当前应保持在 internal / examples 层，不要把 session/export manifest 结构提升到 public API。
+- 本仓库只负责数据集生成和模型接入，不负责本地训练逻辑；训练流程默认放在外部平台。

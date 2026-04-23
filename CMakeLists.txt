@@ -5,6 +5,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+option(RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME "Enable ONNX Runtime model backend support." OFF)
+set(ONNXRUNTIME_ROOT "" CACHE PATH "Path to an ONNX Runtime installation root")
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-O2 -Wall -Wextra -Wpedantic)
@@ -24,6 +26,37 @@ else()
   message(STATUS "Configuring rmcs_laser_guidance in standalone CMake mode")
 endif()
 
+if(RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME)
+  find_path(
+    RMCS_LASER_GUIDANCE_ONNXRUNTIME_INCLUDE_DIR
+    NAMES onnxruntime/core/session/onnxruntime_cxx_api.h
+    HINTS ${ONNXRUNTIME_ROOT} ENV ONNXRUNTIME_ROOT
+    PATH_SUFFIXES include
+  )
+  find_library(
+    RMCS_LASER_GUIDANCE_ONNXRUNTIME_LIBRARY
+    NAMES onnxruntime
+    HINTS ${ONNXRUNTIME_ROOT} ENV ONNXRUNTIME_ROOT
+    PATH_SUFFIXES lib lib64
+  )
+
+  if(NOT RMCS_LASER_GUIDANCE_ONNXRUNTIME_INCLUDE_DIR OR NOT RMCS_LASER_GUIDANCE_ONNXRUNTIME_LIBRARY)
+    message(FATAL_ERROR
+      "RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME=ON requires ONNX Runtime. "
+      "Set ONNXRUNTIME_ROOT or export ONNXRUNTIME_ROOT to point at the installation root.")
+  endif()
+
+  add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+  set_target_properties(
+    onnxruntime::onnxruntime
+    PROPERTIES
+      IMPORTED_LOCATION "${RMCS_LASER_GUIDANCE_ONNXRUNTIME_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${RMCS_LASER_GUIDANCE_ONNXRUNTIME_INCLUDE_DIR}"
+  )
+
+  message(STATUS "ONNX Runtime model backend enabled")
+endif()
+
 set(default_config_path "${CMAKE_CURRENT_SOURCE_DIR}/config/default.yaml")
 set(default_sample_replay_path "${CMAKE_CURRENT_SOURCE_DIR}/test_data/sample_images")
 
@@ -34,9 +67,13 @@ add_library(
   src/debug_renderer.cpp
   src/detector.cpp
   src/frame_format.cpp
+  src/model_adapter.cpp
   src/model_infer.cpp
+  src/model_runtime.cpp
   src/pipeline.cpp
+  src/red_target_refiner.cpp
   src/replay.cpp
+  src/training_data.cpp
   src/v4l2_capture.cpp
 )
 
@@ -51,6 +88,11 @@ target_include_directories(
 )
 
 target_link_libraries(${PROJECT_NAME}_core PUBLIC yaml-cpp::yaml-cpp ${OpenCV_LIBS})
+
+if(RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME)
+  target_link_libraries(${PROJECT_NAME}_core PRIVATE onnxruntime::onnxruntime)
+  target_compile_definitions(${PROJECT_NAME}_core PUBLIC RMCS_LASER_GUIDANCE_WITH_ONNXRUNTIME=1)
+endif()
 
 function(rmcs_laser_guidance_add_default_paths target_name)
   target_compile_definitions(
@@ -81,6 +123,14 @@ enable_testing()
 rmcs_laser_guidance_add_example(example_offline_smoke examples/example_offline_smoke.cpp)
 rmcs_laser_guidance_add_example(example_v4l2_preview examples/example_v4l2_preview.cpp)
 rmcs_laser_guidance_add_example(example_v4l2_capture examples/example_v4l2_capture.cpp)
+rmcs_laser_guidance_add_example(
+  example_v4l2_record_session
+  examples/example_v4l2_record_session.cpp
+)
+rmcs_laser_guidance_add_example(
+  example_export_training_frames
+  examples/example_export_training_frames.cpp
+)
 rmcs_laser_guidance_add_example(example_replay_preview examples/example_replay_preview.cpp)
 rmcs_laser_guidance_add_example(
   example_detector_benchmark
@@ -95,6 +145,8 @@ rmcs_laser_guidance_add_test(detector_test tests/detector_test.cpp)
 rmcs_laser_guidance_add_test(debug_renderer_test tests/debug_renderer_test.cpp)
 rmcs_laser_guidance_add_test(sample_images_test tests/sample_images_test.cpp)
 rmcs_laser_guidance_add_test(model_infer_test tests/model_infer_test.cpp)
+rmcs_laser_guidance_add_test(red_target_refiner_test tests/red_target_refiner_test.cpp)
+rmcs_laser_guidance_add_test(training_data_test tests/training_data_test.cpp)
 
 install(
   TARGETS
@@ -102,6 +154,8 @@ install(
     example_offline_smoke
     example_v4l2_preview
     example_v4l2_capture
+    example_v4l2_record_session
+    example_export_training_frames
     example_replay_preview
     example_detector_benchmark
     example_model_infer

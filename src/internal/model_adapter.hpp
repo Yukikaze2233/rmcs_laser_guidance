@@ -1,0 +1,39 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <opencv2/core/types.hpp>
+
+#include "types.hpp"
+
+namespace rmcs_laser_guidance {
+
+class ModelRuntime;
+
+struct ModelCandidate {
+    float score = 0.0F;
+    cv::Rect2f bbox { };
+    cv::Point2f center{-1.0F, -1.0F};
+};
+
+struct ModelAdapterResult {
+    bool success = false;
+    bool contract_supported = false;
+    TargetObservation observation { };
+    std::vector<ModelCandidate> candidates { };
+    std::string message { };
+};
+
+class ModelAdapter {
+public:
+    virtual ~ModelAdapter() = default;
+
+    virtual auto adapt(const Frame& frame, const ModelRuntime& runtime) const
+        -> ModelAdapterResult = 0;
+};
+
+auto make_default_model_adapter() -> std::unique_ptr<ModelAdapter>;
+
+} // namespace rmcs_laser_guidance

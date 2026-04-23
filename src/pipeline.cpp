@@ -36,7 +36,10 @@ namespace {
             : model_infer_(config.inference) { }
 
         auto process(const Frame& frame) const -> TargetObservation override {
-            return model_infer_.infer(frame).observation;
+            const auto result = model_infer_.infer(frame);
+            if (!result.success)
+                throw std::runtime_error(result.message);
+            return result.observation;
         }
 
     private:

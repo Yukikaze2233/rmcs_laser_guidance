@@ -10,8 +10,9 @@
 当前阶段仍然只是视觉最小骨架，已经落地的能力只有：
 
 - `V4L2/UVC` 取图
+- 原始视频会话录制与离线抽帧导出
 - `Config` / `Frame` / `TargetObservation` / `Pipeline`
-- 内部 `Detector` / `ModelInfer` / `DebugRenderer` / `Replay` / `V4l2Capture`
+- 内部 `Detector` / `ModelInfer` / `ModelRuntime` / `ModelAdapter` / `RedTargetRefiner` / `TrainingData` / `DebugRenderer` / `Replay` / `V4l2Capture`
 - 自动测试与人工运行入口
 
 当前明确**不是**闭环控制系统，不包含：
@@ -62,7 +63,11 @@ internal：
 - `src/internal/detector.hpp`
 - `src/internal/debug_renderer.hpp`
 - `src/internal/replay.hpp`
+- `src/internal/model_runtime.hpp`
+- `src/internal/model_adapter.hpp`
 - `src/internal/model_infer.hpp`
+- `src/internal/red_target_refiner.hpp`
+- `src/internal/training_data.hpp`
 - `src/internal/v4l2_capture.hpp`
 
 设计边界：
@@ -85,6 +90,7 @@ V4l2Capture / synthetic frame / replay frame
 -> Pipeline
 -> selected backend
 -> Detector / ModelInfer
+-> ModelRuntime + ModelAdapter (when backend=model)
 -> TargetObservation {detected, center, contour, brightness}
 -> DebugRenderer / stdout / replay output
 ```
@@ -103,6 +109,16 @@ example_v4l2_capture
 -> ReplayRecorder.record_frame()
 -> manifest.csv + png frames
 
+example_v4l2_record_session
+-> V4l2Capture.open()
+-> read_frame()
+-> raw.avi + session.yaml + notes.txt
+
+example_export_training_frames
+-> load session.yaml
+-> open raw.avi
+-> export images/train|val|test + export manifest
+
 example_replay_preview
 -> load_replay_dataset()
 -> load frame png
@@ -118,7 +134,7 @@ example_replay_preview
 ### 当前构建关系
 ```text
 rmcs_laser_guidance_core
--> config / detector / renderer / replay / v4l2 / pipeline
+-> config / detector / model_runtime / model_adapter / red_target_refiner / training_data / renderer / replay / v4l2 / pipeline
 
 example_*
 -> rmcs_laser_guidance_core
@@ -172,6 +188,12 @@ bridge 不应承载算法实现本身。
 - pipeline 能稳定处理正常图像和异常输入
 - 自动测试与人工入口都存在
 - 核心逻辑不依赖 ROS 控制链
+
+当前模型接入约束补充：
+
+- ONNX Runtime 只能作为可选构建接入，默认构建仍应可在没有 ONNX Runtime 的机器上通过。
+- `model` 后端当前允许读取 `.onnx` 元数据并明确报错，但没有模型专属 adapter 前，不应伪装成“已经支持真实检测”。
+- 本仓库当前只负责模型接入和数据集生成，不负责本地训练逻辑。
 
 以下内容不应在这个阶段偷偷引入：
 

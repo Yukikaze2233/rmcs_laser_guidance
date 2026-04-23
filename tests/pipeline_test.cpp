@@ -39,8 +39,13 @@ int main() {
         model_config.inference.backend    = rmcs_laser_guidance::InferenceBackendKind::model;
         model_config.inference.model_path = "models/mock_detector.onnx";
         rmcs_laser_guidance::Pipeline model_pipeline(model_config);
-        const auto model_observation = model_pipeline.process(positive_frame);
-        require(!model_observation.detected, "model placeholder backend should not detect");
+        bool model_backend_threw = false;
+        try {
+            (void)model_pipeline.process(positive_frame);
+        } catch (const std::exception&) {
+            model_backend_threw = true;
+        }
+        require(model_backend_threw, "model backend should report an explicit error");
 
         return 0;
     } catch (const std::exception& e) {
