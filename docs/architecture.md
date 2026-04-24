@@ -33,7 +33,10 @@ V4l2Capture
 
 ```text
 V4l2Capture
--> raw.avi + session.yaml + notes.txt
+-> VideoSessionRecorder
+-> raw.mp4 + session.yaml + notes.txt
+-> Ultralytics Platform (recommended)
+or
 -> export_training_frames()
 -> images/train|val|test + export_manifest.csv
 -> external annotation / external training platform
@@ -100,10 +103,12 @@ V4l2Capture
 
 ### Training Data
 
+- `VideoSessionRecorder`
+  - 把 live 相机流录成 `raw.mp4`，并在 flush 时写 `session.yaml` 和 `notes.txt`
 - `example_v4l2_record_session`
   - 把 live 相机录成原始视频会话，并同时写 `session.yaml`
 - `export_training_frames`
-  - 把单个视频会话离线抽成待标注图片
+  - 把单个视频会话离线抽成待标注图片；当前作为备用链路保留
 - `write_export_manifest`
   - 为单次导出写出时间戳、split、blur score 等元数据
 
@@ -128,6 +133,10 @@ V4l2Capture
 
 Examples 只负责运行流程，不负责视觉算法本身。
 
+当前推荐的数据集生成工作流详见：
+
+- `docs/dataset_collection.md`
+
 ## 当前输出
 
 当前输出只有两类：
@@ -141,9 +150,10 @@ Examples 只负责运行流程，不负责视觉算法本身。
 - 输入输出 tensor shape
 - 输入输出 tensor element type
 
-数据集导出链路当前还会保留：
+视频会话与可选导出链路当前还会保留：
 
 - 视频会话元数据
+- 原始视频路径
 - 导出帧时间戳
 - 导出帧 blur score
 

@@ -3,7 +3,7 @@
 `rmcs_laser_guidance` 是一个最小激光视觉引导骨架，当前阶段只覆盖：
 
 - `V4L2/UVC` 采集卡取图
-- 原始视频会话录制与离线抽帧导出
+- 原始视频会话录制与可选离线抽帧导出
 - YAML 配置加载
 - `Pipeline` 统一视觉入口与可切换后端骨架
 - 最小亮点检测 `Detector`
@@ -100,13 +100,21 @@ V4L2 原始视频会话录制：
 ros2 run rmcs_laser_guidance example_v4l2_record_session
 ```
 
+不显式传输出目录时，默认保存到仓库根目录下的 `videos/`。
+录制入口会在运行时强制把 `v4l2.pixel_format` 覆盖为 `yuyv`；`preview` 仍按配置文件读取。
+`capture_red_20m.yaml` 现在还包含 `record.output_root`、`record.duration_seconds` 和场景标签，所以只传配置文件就能录制。
+
 也可以显式传录制根目录和时长：
 
 ```bash
 ros2 run rmcs_laser_guidance example_v4l2_record_session \
-  /abs/path/to/default.yaml \
+  /abs/path/to/config/capture_red_20m.yaml \
   /abs/path/to/session_root \
-  30
+  30 \
+  indoor_lab \
+  plain_wall \
+  20m \
+  red
 ```
 
 回放预览：
@@ -136,7 +144,7 @@ ros2 run rmcs_laser_guidance example_model_infer \
   /abs/path/to/model.onnx
 ```
 
-离线抽帧生成待标注数据集：
+离线抽帧生成待标注数据集（可选备用）：
 
 ```bash
 ros2 run rmcs_laser_guidance example_export_training_frames \
@@ -149,12 +157,17 @@ ros2 run rmcs_laser_guidance example_export_training_frames \
 ## Notes
 
 - 默认配置文件位于 `config/default.yaml`
+- 推荐视频采集配置位于 `config/capture_red_20m.yaml`
+  默认使用 UGREEN 采集卡直读节点 `/dev/video2`；如果你的机器编号不同，修改 `v4l2.device_path`
+  录制参数也可放在 `record.*` 中；现有 CLI 位置参数仍可覆盖这些值
 - 默认样本回放位于 `test_data/sample_images`
+- 默认原始视频会话目录位于仓库根目录 `videos/`
 - `models/` 用于放置 `.onnx` 模型文件
 - public 头文件平铺在 `include/`，实现细节头收束在 `src/internal/`
-- 默认 live 输入为 UVC 采集卡 `v4l2.device_path=/dev/video0`
-- 默认 live 模式为 `1920x1080 @ 60 FPS`，优先 `mjpeg`
-- 训练数据链路当前推荐“先录原始视频会话，再离线抽帧生成待标注图片”
+- 当前默认 live 输入为 UGREEN 采集卡直读节点 `v4l2.device_path=/dev/video2`
+- 当前默认 live 模式为 `1920x1080 @ 60 FPS`，优先 `yuyv`
+- 训练数据链路当前推荐“先录原始视频会话，再直接上传外部平台”；离线抽帧只作为本地待标注备用链路
+- `raw.mp4 + session.yaml + notes.txt` 用于保留完整采集会话，并对接外部标注/训练平台
 - 抽帧导出会生成 `images/train|val|test` 和按会话区分的 `export_manifest.csv`
 - 当前检测逻辑仍然是极简亮点检测实现，用于把工程链路跑通
 - 红色目标精修当前以内部 `RedTargetRefiner` 形式存在，预留给后续模型 ROI 后处理使用
@@ -170,5 +183,6 @@ ros2 run rmcs_laser_guidance example_export_training_frames \
 - `plan.md`
 - `docs/README.md`
 - `docs/architecture.md`
+- `docs/dataset_collection.md`
 - `docs/development.md`
 - `docs/future_rmcs_integration.md`

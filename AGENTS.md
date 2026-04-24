@@ -10,7 +10,7 @@
 当前阶段仍然只是视觉最小骨架，已经落地的能力只有：
 
 - `V4L2/UVC` 取图
-- 原始视频会话录制与离线抽帧导出
+- 原始视频会话录制与可选离线抽帧导出
 - `Config` / `Frame` / `TargetObservation` / `Pipeline`
 - 内部 `Detector` / `ModelInfer` / `ModelRuntime` / `ModelAdapter` / `RedTargetRefiner` / `TrainingData` / `DebugRenderer` / `Replay` / `V4l2Capture`
 - 自动测试与人工运行入口
@@ -32,6 +32,8 @@
   - 顶层构建入口，支持 standalone CMake 与 ament 双模式。
 - `config/default.yaml`
   - 默认运行配置。
+- `config/capture_red_20m.yaml`
+  - 推荐的原始视频采集配置。
 - `models/`
   - 放置 `.onnx` 模型文件。
 - `include/`
@@ -112,12 +114,14 @@ example_v4l2_capture
 example_v4l2_record_session
 -> V4l2Capture.open()
 -> read_frame()
--> raw.avi + session.yaml + notes.txt
+-> VideoSessionRecorder.record_frame()
+-> raw.mp4 + session.yaml + notes.txt
+-> direct upload to external platform or optional export_training_frames
 
 example_export_training_frames
 -> load session.yaml
--> open raw.avi
--> export images/train|val|test + export manifest
+-> open raw.mp4
+-> export images/train|val|test + export manifest (optional fallback)
 
 example_replay_preview
 -> load_replay_dataset()

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <print>
 
+#include "../examples/example_support.hpp"
 #include "config.hpp"
 #include "test_utils.hpp"
 
@@ -9,12 +10,12 @@ int main() {
         using namespace rmcs_laser_guidance::tests;
 
         const auto default_config = rmcs_laser_guidance::load_config(default_config_path());
-        require(default_config.v4l2.device_path == std::filesystem::path("/dev/video0"),
+        require(default_config.v4l2.device_path == std::filesystem::path("/dev/video2"),
             "default device path mismatch");
         require(default_config.v4l2.width == 1920, "default width mismatch");
         require(default_config.v4l2.height == 1080, "default height mismatch");
         require_near(default_config.v4l2.framerate, 60.0F, 1e-3F, "default framerate");
-        require(default_config.v4l2.pixel_format == rmcs_laser_guidance::V4l2PixelFormat::mjpeg,
+        require(default_config.v4l2.pixel_format == rmcs_laser_guidance::V4l2PixelFormat::yuyv,
             "default pixel format mismatch");
         require(!default_config.v4l2.invert_image, "default invert_image mismatch");
         require(default_config.debug.show_window, "default show_window mismatch");
@@ -23,6 +24,72 @@ int main() {
                 == rmcs_laser_guidance::InferenceBackendKind::bright_spot,
             "default inference backend mismatch");
         require(default_config.inference.model_path.empty(), "default model path mismatch");
+        require(default_video_session_root()
+                == (default_config_path().parent_path().parent_path() / "videos"),
+            "default video session root mismatch");
+        const auto default_record_options =
+            rmcs_laser_guidance::examples::load_record_session_options(default_config_path());
+        require(default_record_options.output_root == default_video_session_root(),
+            "default record output root mismatch");
+        require_near(static_cast<float>(default_record_options.duration_seconds), 30.0F, 1e-3F,
+            "default record duration mismatch");
+        require(default_record_options.lighting_tag == "unspecified",
+            "default record lighting tag mismatch");
+        require(default_record_options.background_tag == "unspecified",
+            "default record background tag mismatch");
+        require(default_record_options.distance_tag == "unspecified",
+            "default record distance tag mismatch");
+        require(
+            default_record_options.target_color == "red", "default record target color mismatch");
+        const auto forced_record_v4l2_config =
+            rmcs_laser_guidance::examples::record_session_v4l2_config({
+                .device_path  = "/dev/video7",
+                .width        = 1280,
+                .height       = 720,
+                .framerate    = 59.94F,
+                .pixel_format = rmcs_laser_guidance::V4l2PixelFormat::mjpeg,
+                .invert_image = true,
+            });
+        require(forced_record_v4l2_config.device_path == std::filesystem::path("/dev/video7"),
+            "record override device path mismatch");
+        require(forced_record_v4l2_config.width == 1280, "record override width mismatch");
+        require(forced_record_v4l2_config.height == 720, "record override height mismatch");
+        require_near(
+            forced_record_v4l2_config.framerate, 59.94F, 1e-3F, "record override framerate");
+        require(
+            forced_record_v4l2_config.pixel_format == rmcs_laser_guidance::V4l2PixelFormat::yuyv,
+            "record override pixel format mismatch");
+        require(forced_record_v4l2_config.invert_image, "record override invert_image mismatch");
+
+        const auto capture_profile_path =
+            default_config_path().parent_path() / "capture_red_20m.yaml";
+        const auto capture_profile = rmcs_laser_guidance::load_config(capture_profile_path);
+        require(capture_profile.v4l2.device_path == std::filesystem::path("/dev/video2"),
+            "capture profile device path mismatch");
+        require(capture_profile.v4l2.width == 1920, "capture profile width mismatch");
+        require(capture_profile.v4l2.height == 1080, "capture profile height mismatch");
+        require_near(
+            capture_profile.v4l2.framerate, 60.0F, 1e-3F, "capture profile framerate mismatch");
+        require(capture_profile.v4l2.pixel_format == rmcs_laser_guidance::V4l2PixelFormat::yuyv,
+            "capture profile pixel format mismatch");
+        require(
+            !capture_profile.debug.show_window, "capture profile show_window should be disabled");
+        require(
+            !capture_profile.debug.draw_overlay, "capture profile draw_overlay should be disabled");
+        const auto capture_record_options =
+            rmcs_laser_guidance::examples::load_record_session_options(capture_profile_path);
+        require(capture_record_options.output_root == std::filesystem::path("./videos"),
+            "capture record output root mismatch");
+        require_near(static_cast<float>(capture_record_options.duration_seconds), 30.0F, 1e-3F,
+            "capture record duration mismatch");
+        require(capture_record_options.lighting_tag == "indoor_lab",
+            "capture record lighting tag mismatch");
+        require(capture_record_options.background_tag == "plain_wall",
+            "capture record background tag mismatch");
+        require(
+            capture_record_options.distance_tag == "20m", "capture record distance tag mismatch");
+        require(
+            capture_record_options.target_color == "red", "capture record target color mismatch");
 
         const auto override_path = make_temp_path("rmcs_laser_guidance_config_override");
         write_text_file(override_path,

@@ -1,6 +1,7 @@
 #include "internal/training_data.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <ctime>
 #include <fstream>
@@ -8,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -17,55 +19,144 @@
 namespace rmcs_laser_guidance {
 namespace {
 
-constexpr const char* kExportManifestHeader =
-    "image_name,source_session_id,source_timestamp_ms,split,blur_score,width,height,relative_image_path";
+    constexpr const char* kExportManifestHeader = "image_name,source_session_id,source_timestamp_"
+                                                  "ms,split,blur_score,width,height,relative_image_"
+                                                  "path";
 
-auto normalize_split_name(std::string_view split) -> std::string {
-    std::string normalized(split);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-        [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-
-    if (normalized != "train" && normalized != "val" && normalized != "test") {
-        throw std::runtime_error("split must be one of: train, val, test");
+    auto normalize_lower(std::string value) -> std::string {
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        return value;
     }
 
-    return normalized;
-}
+    auto video_writer_fourcc_for_path(const std::filesystem::path& path) -> int {
+        const std::string extension = normalize_lower(path.extension().string());
+        if (extension == ".mp4") return cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+        if (extension == ".avi") return cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
 
-auto to_gray_image(const cv::Mat& image) -> cv::Mat {
-    if (image.empty())
-        return { };
-
-    if (image.channels() == 1)
-        return image;
-
-    cv::Mat gray;
-    if (image.channels() == 3) {
-        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        return gray;
+        throw std::runtime_error(
+            "unsupported session video extension, expected .mp4 or .avi: " + path.string());
     }
 
-    if (image.channels() == 4) {
-        cv::cvtColor(image, gray, cv::COLOR_BGRA2GRAY);
-        return gray;
+    auto normalize_split_name(std::string_view split) -> std::string {
+        const std::string normalized = normalize_lower(std::string(split));
+
+        if (normalized != "train" && normalized != "val" && normalized != "test") {
+            throw std::runtime_error("split must be one of: train, val, test");
+        }
+
+        return normalized;
     }
 
-    throw std::runtime_error("unsupported image channel count for blur scoring");
-}
+    auto to_gray_image(const cv::Mat& image) -> cv::Mat {
+        if (image.empty()) return { };
 
-auto make_image_name(std::string_view session_id, const std::int64_t timestamp_ms) -> std::string {
-    std::ostringstream oss;
-    oss << session_id << "_t" << std::setw(8) << std::setfill('0') << timestamp_ms << "ms.png";
-    return oss.str();
-}
+        if (image.channels() == 1) return image;
+
+        cv::Mat gray;
+        if (image.channels() == 3) {
+            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+            return gray;
+        }
+
+        if (image.channels() == 4) {
+            cv::cvtColor(image, gray, cv::COLOR_BGRA2GRAY);
+            return gray;
+        }
+
+        throw std::runtime_error("unsupported image channel count for blur scoring");
+    }
+
+    auto make_image_name(std::string_view session_id, const std::int64_t timestamp_ms)
+        -> std::string {
+        std::ostringstream oss;
+        oss << session_id << "_t" << std::setw(8) << std::setfill('0') << timestamp_ms << "ms.png";
+        return oss.str();
+    }
+
+    auto validate_video_session_metadata(const VideoSessionMetadata& metadata) -> void {
+        if (metadata.session_id.empty())
+            throw std::runtime_error("video session metadata requires a non-empty session_id");
+        if (metadata.relative_video_path.empty())
+            throw std::runtime_error("video session metadata requires a relative_video_path");
+        if (metadata.relative_video_path.is_absolute()) {
+            throw std::runtime_error("video session metadata relative_video_path must be relative");
+        }
+        (void)video_writer_fourcc_for_path(metadata.relative_video_path);
+        if (metadata.width <= 0 || metadata.height <= 0) {
+            throw std::runtime_error("video session metadata requires positive frame dimensions");
+        }
+        if (metadata.framerate <= 0.0)
+            throw std::runtime_error("video session metadata requires a positive framerate");
+    }
+
+    auto write_session_notes_template(
+        const std::filesystem::path& path, const VideoSessionMetadata& metadata) -> void {
+        if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
+
+        std::ofstream notes(path);
+        if (!notes) throw std::runtime_error("failed to create session notes file");
+
+        notes << "lighting_tag: " << metadata.lighting_tag << '\n';
+        notes << "background_tag: " << metadata.background_tag << '\n';
+        notes << "distance_tag: " << metadata.distance_tag << '\n';
+        notes << "target_color: " << metadata.target_color << '\n';
+        notes << "pollution_light_source: \n";
+        notes << "target_motion_note: \n";
+        notes << "operator_note: \n";
+    }
 
 } // namespace
 
+VideoSessionRecorder::VideoSessionRecorder(
+    std::filesystem::path output_root, VideoSessionMetadata metadata)
+    : metadata_(std::move(metadata)) {
+    validate_video_session_metadata(metadata_);
+
+    session_root_  = std::move(output_root) / metadata_.session_id;
+    video_path_    = session_root_ / metadata_.relative_video_path;
+    metadata_path_ = session_root_ / "session.yaml";
+    notes_path_    = session_root_ / "notes.txt";
+
+    std::filesystem::create_directories(session_root_);
+    if (video_path_.has_parent_path())
+        std::filesystem::create_directories(video_path_.parent_path());
+
+    writer_.open(video_path_.string(), video_writer_fourcc_for_path(video_path_),
+        metadata_.framerate, cv::Size(metadata_.width, metadata_.height));
+    if (!writer_.isOpened()) {
+        throw std::runtime_error(
+            "failed to open session video for writing: " + video_path_.string());
+    }
+}
+
+auto VideoSessionRecorder::record_frame(const cv::Mat& image) -> void {
+    if (flushed_) throw std::runtime_error("cannot record frame after video session flush");
+    if (!writer_.isOpened()) throw std::runtime_error("video session writer is not open");
+    if (image.empty()) throw std::runtime_error("cannot record empty session frame");
+    if (image.cols != metadata_.width || image.rows != metadata_.height) {
+        throw std::runtime_error("session frame size does not match negotiated video dimensions");
+    }
+
+    writer_.write(image);
+    ++recorded_frames_;
+}
+
+auto VideoSessionRecorder::flush(const std::int64_t duration_ms) -> void {
+    if (flushed_) throw std::runtime_error("video session already flushed");
+    if (duration_ms < 0) throw std::runtime_error("video session duration must be non-negative");
+
+    writer_.release();
+    metadata_.duration_ms = duration_ms;
+    write_video_session_metadata(metadata_path_, metadata_);
+    write_session_notes_template(notes_path_, metadata_);
+    flushed_ = true;
+}
+
 auto format_session_id(const std::chrono::system_clock::time_point capture_start) -> std::string {
     const std::time_t timestamp = std::chrono::system_clock::to_time_t(capture_start);
-    const std::tm* local_time = std::localtime(&timestamp);
-    if (local_time == nullptr)
-        throw std::runtime_error("failed to format capture start time");
+    const std::tm* local_time   = std::localtime(&timestamp);
+    if (local_time == nullptr) throw std::runtime_error("failed to format capture start time");
 
     std::ostringstream oss;
     oss << std::put_time(local_time, "%Y%m%dT%H%M%S");
@@ -74,8 +165,7 @@ auto format_session_id(const std::chrono::system_clock::time_point capture_start
 
 auto write_video_session_metadata(
     const std::filesystem::path& path, const VideoSessionMetadata& metadata) -> void {
-    if (path.has_parent_path())
-        std::filesystem::create_directories(path.parent_path());
+    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
 
     YAML::Emitter out;
     out << YAML::BeginMap;
@@ -97,8 +187,7 @@ auto write_video_session_metadata(
     out << YAML::EndMap;
 
     std::ofstream metadata_file(path);
-    if (!metadata_file)
-        throw std::runtime_error("failed to open session metadata for writing");
+    if (!metadata_file) throw std::runtime_error("failed to open session metadata for writing");
     metadata_file << out.c_str();
 }
 
@@ -132,8 +221,7 @@ auto load_video_session_metadata(const std::filesystem::path& path) -> VideoSess
 
 auto blur_score_for_frame(const cv::Mat& image) -> double {
     const cv::Mat gray = to_gray_image(image);
-    if (gray.empty())
-        return 0.0;
+    if (gray.empty()) return 0.0;
 
     cv::Mat laplacian;
     cv::Laplacian(gray, laplacian, CV_64F);
@@ -148,8 +236,7 @@ auto blur_score_for_frame(const cv::Mat& image) -> double {
 auto export_training_frames(const std::filesystem::path& video_path, std::string_view session_id,
     const std::filesystem::path& dataset_root, std::string_view split,
     const std::int64_t sample_interval_ms) -> std::vector<ExportedTrainingFrame> {
-    if (sample_interval_ms <= 0)
-        throw std::runtime_error("sample_interval_ms must be positive");
+    if (sample_interval_ms <= 0) throw std::runtime_error("sample_interval_ms must be positive");
 
     const std::string normalized_split = normalize_split_name(split);
 
@@ -159,15 +246,14 @@ auto export_training_frames(const std::filesystem::path& video_path, std::string
     }
 
     const double fps = capture.get(cv::CAP_PROP_FPS);
-    if (fps <= 0.0)
-        throw std::runtime_error("session video reports non-positive FPS");
+    if (fps <= 0.0) throw std::runtime_error("session video reports non-positive FPS");
 
     const std::filesystem::path image_root = dataset_root / "images" / normalized_split;
     std::filesystem::create_directories(image_root);
 
     std::vector<ExportedTrainingFrame> exported_frames;
     std::int64_t next_export_ms = 0;
-    std::size_t frame_index = 0;
+    std::size_t frame_index     = 0;
 
     cv::Mat frame;
     while (capture.read(frame)) {
@@ -180,22 +266,21 @@ auto export_training_frames(const std::filesystem::path& video_path, std::string
             static_cast<std::int64_t>(std::llround((1000.0 * frame_index) / fps));
         ++frame_index;
 
-        if (timestamp_ms < next_export_ms)
-            continue;
+        if (timestamp_ms < next_export_ms) continue;
 
-        const std::string image_name = make_image_name(session_id, timestamp_ms);
+        const std::string image_name           = make_image_name(session_id, timestamp_ms);
         const std::filesystem::path image_path = image_root / image_name;
         if (!cv::imwrite(image_path.string(), frame))
             throw std::runtime_error("failed to write exported training frame");
 
-        exported_frames.push_back(ExportedTrainingFrame{
-            .image_name = image_name,
-            .source_session_id = std::string(session_id),
+        exported_frames.push_back(ExportedTrainingFrame {
+            .image_name          = image_name,
+            .source_session_id   = std::string(session_id),
             .source_timestamp_ms = timestamp_ms,
-            .split = normalized_split,
-            .blur_score = blur_score_for_frame(frame),
-            .width = frame.cols,
-            .height = frame.rows,
+            .split               = normalized_split,
+            .blur_score          = blur_score_for_frame(frame),
+            .width               = frame.cols,
+            .height              = frame.rows,
             .relative_image_path = image_path.lexically_relative(dataset_root),
         });
 
@@ -209,20 +294,17 @@ auto export_training_frames(const std::filesystem::path& video_path, std::string
 
 auto write_export_manifest(
     const std::filesystem::path& path, const std::vector<ExportedTrainingFrame>& frames) -> void {
-    if (path.has_parent_path())
-        std::filesystem::create_directories(path.parent_path());
+    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
 
     std::ofstream manifest(path);
-    if (!manifest)
-        throw std::runtime_error("failed to open export manifest for writing");
+    if (!manifest) throw std::runtime_error("failed to open export manifest for writing");
 
     manifest << kExportManifestHeader << '\n';
     for (const auto& frame : frames) {
         manifest << frame.image_name << ',' << frame.source_session_id << ','
-                 << frame.source_timestamp_ms << ',' << frame.split << ','
-                 << std::fixed << std::setprecision(4) << frame.blur_score << ',' << frame.width
-                 << ',' << frame.height << ',' << frame.relative_image_path.generic_string()
-                 << '\n';
+                 << frame.source_timestamp_ms << ',' << frame.split << ',' << std::fixed
+                 << std::setprecision(4) << frame.blur_score << ',' << frame.width << ','
+                 << frame.height << ',' << frame.relative_image_path.generic_string() << '\n';
     }
 }
 

@@ -59,6 +59,7 @@ endif()
 
 set(default_config_path "${CMAKE_CURRENT_SOURCE_DIR}/config/default.yaml")
 set(default_sample_replay_path "${CMAKE_CURRENT_SOURCE_DIR}/test_data/sample_images")
+set(default_video_session_root "${CMAKE_CURRENT_SOURCE_DIR}/videos")
 
 add_library(
   ${PROJECT_NAME}_core
@@ -100,6 +101,7 @@ function(rmcs_laser_guidance_add_default_paths target_name)
     PRIVATE
       RMCS_LASER_GUIDANCE_DEFAULT_CONFIG_PATH="${default_config_path}"
       RMCS_LASER_GUIDANCE_DEFAULT_SAMPLE_REPLAY_PATH="${default_sample_replay_path}"
+      RMCS_LASER_GUIDANCE_DEFAULT_VIDEO_SESSION_ROOT="${default_video_session_root}"
   )
 endfunction()
 
@@ -120,23 +122,23 @@ endfunction()
 
 enable_testing()
 
-rmcs_laser_guidance_add_example(example_offline_smoke examples/example_offline_smoke.cpp)
-rmcs_laser_guidance_add_example(example_v4l2_preview examples/example_v4l2_preview.cpp)
-rmcs_laser_guidance_add_example(example_v4l2_capture examples/example_v4l2_capture.cpp)
+rmcs_laser_guidance_add_example(example_offline_smoke examples/offline_smoke.cpp)
+rmcs_laser_guidance_add_example(example_v4l2_preview examples/v4l2_preview.cpp)
+rmcs_laser_guidance_add_example(example_v4l2_capture examples/v4l2_capture.cpp)
 rmcs_laser_guidance_add_example(
   example_v4l2_record_session
-  examples/example_v4l2_record_session.cpp
+  examples/v4l2_record_session.cpp
 )
 rmcs_laser_guidance_add_example(
   example_export_training_frames
-  examples/example_export_training_frames.cpp
+  examples/export_training_frames.cpp
 )
-rmcs_laser_guidance_add_example(example_replay_preview examples/example_replay_preview.cpp)
+rmcs_laser_guidance_add_example(example_replay_preview examples/replay_preview.cpp)
 rmcs_laser_guidance_add_example(
   example_detector_benchmark
-  examples/example_detector_benchmark.cpp
+  examples/detector_benchmark.cpp
 )
-rmcs_laser_guidance_add_example(example_model_infer examples/example_model_infer.cpp)
+rmcs_laser_guidance_add_example(example_model_infer examples/model_infer.cpp)
 
 rmcs_laser_guidance_add_test(config_test tests/config_test.cpp)
 rmcs_laser_guidance_add_test(pipeline_test tests/pipeline_test.cpp)
