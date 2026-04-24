@@ -101,7 +101,7 @@ ros2 run rmcs_laser_guidance example_v4l2_record_session \
 其中：
 
 - `raw.mp4`
-  - 原始视频，优先直接上传 Ultralytics Platform；也可作为本地离线抽帧输入
+  - 原始视频，默认写为 `H.264/avc1`，优先直接上传 Ultralytics Platform；也可作为本地离线抽帧输入
 - `session.yaml`
   - 记录设备、分辨率、帧率、场景标签
 - `notes.txt`
@@ -136,6 +136,13 @@ ros2 run rmcs_laser_guidance example_v4l2_record_session \
 2. 保留 `session.yaml` 和 `notes.txt` 作为场景记录
 3. 直接把 `raw.mp4` 上传到 Ultralytics Platform
 4. 在平台内完成抽帧、标注和训练
+
+如果你手里已有旧的 `mp4v` 会话，可以先原地转码：
+
+```bash
+ros2 run rmcs_laser_guidance example_transcode_recorded_session \
+  /abs/path/to/videos/<session_id>
+```
 
 这样做的优点是：
 

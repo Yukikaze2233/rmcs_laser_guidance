@@ -118,6 +118,11 @@ example_v4l2_record_session
 -> raw.mp4 + session.yaml + notes.txt
 -> direct upload to external platform or optional export_training_frames
 
+example_transcode_recorded_session
+-> load session.yaml
+-> locate raw.mp4
+-> ffmpeg transcode to H.264/avc1 in place
+
 example_export_training_frames
 -> load session.yaml
 -> open raw.mp4

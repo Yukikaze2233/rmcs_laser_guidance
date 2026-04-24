@@ -37,6 +37,10 @@ V4l2Capture
 -> raw.mp4 + session.yaml + notes.txt
 -> Ultralytics Platform (recommended)
 or
+-> example_transcode_recorded_session
+-> ffmpeg in-place transcode to H.264/avc1
+-> Ultralytics Platform
+or
 -> export_training_frames()
 -> images/train|val|test + export_manifest.csv
 -> external annotation / external training platform
@@ -104,9 +108,13 @@ or
 ### Training Data
 
 - `VideoSessionRecorder`
-  - 把 live 相机流录成 `raw.mp4`，并在 flush 时写 `session.yaml` 和 `notes.txt`
+  - 把 live 相机流录成 `raw.mp4`（默认 `H.264/avc1`），并在 flush 时写 `session.yaml` 和 `notes.txt`
+- `transcode_video_to_h264_in_place`
+  - 用 `ffmpeg` 把已有 `raw.mp4` 原地转成 `H.264/avc1`
 - `example_v4l2_record_session`
   - 把 live 相机录成原始视频会话，并同时写 `session.yaml`
+- `example_transcode_recorded_session`
+  - 对单个已录会话做原地 H.264 转码
 - `export_training_frames`
   - 把单个视频会话离线抽成待标注图片；当前作为备用链路保留
 - `write_export_manifest`
@@ -120,6 +128,8 @@ or
   - 录帧入口
 - `example_v4l2_record_session`
   - 原始视频会话录制入口
+- `example_transcode_recorded_session`
+  - 已录视频原地转码入口
 - `example_export_training_frames`
   - 离线抽帧导出入口
 - `example_offline_smoke`

@@ -20,6 +20,19 @@ auto make_frame(const cv::Scalar& background, const bool with_edges) -> cv::Mat 
     return image;
 }
 
+auto write_test_video(const std::filesystem::path& path, const int fourcc, const double fps = 10.0)
+    -> void {
+    cv::VideoWriter writer(path.string(), fourcc, fps, cv::Size(160, 120));
+    if (!writer.isOpened()) throw std::runtime_error("failed to open test video writer");
+
+    writer.write(make_frame({ 0, 0, 0 }, true));
+    writer.write(make_frame({ 30, 30, 30 }, false));
+    writer.write(make_frame({ 0, 0, 0 }, true));
+    writer.write(make_frame({ 50, 50, 50 }, false));
+    writer.write(make_frame({ 0, 0, 0 }, true));
+    writer.release();
+}
+
 struct VideoInspection {
     std::size_t frame_count = 0;
     int width               = 0;
@@ -115,6 +128,13 @@ int main() {
         require_contains(notes_text, "lighting_tag: lab", "session notes lighting tag");
         require_contains(notes_text, "target_color: red", "session notes target color");
 
+        const auto recorded_encoding =
+            rmcs_laser_guidance::probe_video_encoding_info(recorder.video_path());
+        require(recorded_encoding.codec_name == "h264", "recorded session codec mismatch");
+        require(
+            recorded_encoding.codec_tag_string == "avc1", "recorded session codec tag mismatch");
+        require(recorded_encoding.pix_fmt == "yuv420p", "recorded session pix fmt mismatch");
+
         const auto inspection = inspect_video(recorder.video_path());
         require(inspection.width == metadata.width, "recorded session video width mismatch");
         require(inspection.height == metadata.height, "recorded session video height mismatch");
@@ -126,6 +146,21 @@ int main() {
         require(rmcs_laser_guidance::blur_score_for_frame(sharp)
                 > rmcs_laser_guidance::blur_score_for_frame(blurred),
             "sharp frame should have higher blur score than blurred frame");
+
+        const auto legacy_video_path = temp_root / "legacy_raw.mp4";
+        write_test_video(legacy_video_path, cv::VideoWriter::fourcc('m', 'p', '4', 'v'));
+        const auto legacy_encoding =
+            rmcs_laser_guidance::probe_video_encoding_info(legacy_video_path);
+        require(legacy_encoding.codec_name == "mpeg4", "legacy session codec mismatch");
+        require(legacy_encoding.codec_tag_string == "mp4v", "legacy session codec tag mismatch");
+
+        rmcs_laser_guidance::transcode_video_to_h264_in_place(legacy_video_path);
+        const auto transcoded_encoding =
+            rmcs_laser_guidance::probe_video_encoding_info(legacy_video_path);
+        require(transcoded_encoding.codec_name == "h264", "transcoded session codec mismatch");
+        require(transcoded_encoding.codec_tag_string == "avc1",
+            "transcoded session codec tag mismatch");
+        require(transcoded_encoding.pix_fmt == "yuv420p", "transcoded session pix fmt mismatch");
 
         const auto dataset_root = temp_root / "dataset";
         const auto exported     = rmcs_laser_guidance::export_training_frames(

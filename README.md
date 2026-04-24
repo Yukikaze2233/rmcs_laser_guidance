@@ -144,6 +144,13 @@ ros2 run rmcs_laser_guidance example_model_infer \
   /abs/path/to/model.onnx
 ```
 
+把已录制 session 的 `raw.mp4` 原地转为 `H.264/avc1`：
+
+```bash
+ros2 run rmcs_laser_guidance example_transcode_recorded_session \
+  /abs/path/to/videos/<session_id>
+```
+
 离线抽帧生成待标注数据集（可选备用）：
 
 ```bash
@@ -168,6 +175,7 @@ ros2 run rmcs_laser_guidance example_export_training_frames \
 - 当前默认 live 模式为 `1920x1080 @ 60 FPS`，优先 `yuyv`
 - 训练数据链路当前推荐“先录原始视频会话，再直接上传外部平台”；离线抽帧只作为本地待标注备用链路
 - `raw.mp4 + session.yaml + notes.txt` 用于保留完整采集会话，并对接外部标注/训练平台
+  `.mp4` 现在默认写为 `H.264/avc1`
 - 抽帧导出会生成 `images/train|val|test` 和按会话区分的 `export_manifest.csv`
 - 当前检测逻辑仍然是极简亮点检测实现，用于把工程链路跑通
 - 红色目标精修当前以内部 `RedTargetRefiner` 形式存在，预留给后续模型 ROI 后处理使用

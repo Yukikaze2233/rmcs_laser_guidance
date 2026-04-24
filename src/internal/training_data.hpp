@@ -41,6 +41,15 @@ struct ExportedTrainingFrame {
     std::filesystem::path relative_image_path { };
 };
 
+struct VideoEncodingInfo {
+    std::string codec_name { };
+    std::string codec_tag_string { };
+    std::string profile { };
+    std::string pix_fmt { };
+    int width  = 0;
+    int height = 0;
+};
+
 class VideoSessionRecorder {
 public:
     VideoSessionRecorder(std::filesystem::path output_root, VideoSessionMetadata metadata);
@@ -77,6 +86,9 @@ auto format_session_id(std::chrono::system_clock::time_point capture_start) -> s
 auto write_video_session_metadata(
     const std::filesystem::path& path, const VideoSessionMetadata& metadata) -> void;
 auto load_video_session_metadata(const std::filesystem::path& path) -> VideoSessionMetadata;
+
+auto probe_video_encoding_info(const std::filesystem::path& video_path) -> VideoEncodingInfo;
+auto transcode_video_to_h264_in_place(const std::filesystem::path& video_path) -> void;
 
 auto blur_score_for_frame(const cv::Mat& image) -> double;
 auto export_training_frames(const std::filesystem::path& video_path, std::string_view session_id,

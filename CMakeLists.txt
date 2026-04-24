@@ -139,6 +139,10 @@ rmcs_laser_guidance_add_example(
   examples/detector_benchmark.cpp
 )
 rmcs_laser_guidance_add_example(example_model_infer examples/model_infer.cpp)
+rmcs_laser_guidance_add_example(
+  example_transcode_recorded_session
+  examples/transcode_recorded_session.cpp
+)
 
 rmcs_laser_guidance_add_test(config_test tests/config_test.cpp)
 rmcs_laser_guidance_add_test(pipeline_test tests/pipeline_test.cpp)
@@ -161,6 +165,7 @@ install(
     example_replay_preview
     example_detector_benchmark
     example_model_infer
+    example_transcode_recorded_session
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION lib/${PROJECT_NAME}
