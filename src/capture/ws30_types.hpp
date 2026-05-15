@@ -20,6 +20,12 @@ enum class Ws30PacketKind : std::uint8_t {
     unknown,
 };
 
+enum class Ws30StreamKind : std::uint8_t {
+    points = 0,
+    imu = 1,
+    status = 2,
+};
+
 struct Ws30PointSample {
     std::uint16_t row = 0;
     std::uint16_t col = 0;
@@ -101,5 +107,6 @@ struct Ws30DeviceInfo {
 };
 
 auto ws30_packet_kind_name(Ws30PacketKind kind) -> const char*;
+auto ws30_stream_kind_name(Ws30StreamKind kind) -> const char*;
 
 } // namespace rmcs_laser_guidance
