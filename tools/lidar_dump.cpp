@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -161,6 +160,10 @@ auto print_device_info(const Ws30DeviceInfo& info) -> void {
     }
 }
 
+auto log_command_error(const char* label, const std::expected<void, std::string>& result) -> void {
+    if (!result) std::println(stderr, "tool_lidar_dump: failed to {}: {}", label, result.error());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -225,8 +228,8 @@ int main(int argc, char** argv) {
             else std::println(stderr, "status: timeout waiting for packet");
         }
 
-        if (options->request_points) (void)client.request_points_stream(false);
-        if (options->request_imu) (void)client.request_imu_stream(false);
+        if (options->request_points) log_command_error("stop points stream", client.request_points_stream(false));
+        if (options->request_imu) log_command_error("stop imu stream", client.request_imu_stream(false));
         client.close();
         return 0;
     } catch (const std::exception& e) {
