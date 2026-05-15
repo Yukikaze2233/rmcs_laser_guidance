@@ -1,14 +1,21 @@
 # WS30 LiDAR
 
+## Repository
+
+WS30 核心库已抽出为独立子模块：
+- `external/ws30_lidar_core` — `github.com/Yukikaze2233/ws30_lidar_core`
+- 命名空间 `ws30_lidar`，零 ROS/OpenCV 依赖
+
 ## Current Status
 
-当前仓库已经落地的 WS30 能力只有 standalone scaffold：
+当前仓库已经落地的 WS30 能力：
 
 - `Ws30UdpSocket`
 - `Ws30PacketParser`
 - `Ws30FrameAssembler`
 - `Ws30Client`
 - `tool_lidar_dump`
+- `ws30_lidar_node`（ROS2 bridge）
 
 它的目标不是马上接控制链，而是先确认：
 
@@ -19,7 +26,6 @@
 
 当前**尚未实现**：
 
-- ROS2 `PointCloud2` 发布
 - 与 `GuidancePipeline` 的深度融合
 
 ## Current Debug Entry
@@ -42,6 +48,18 @@
 - 从 raw log 回放 (`--replay`)
 - 将完整点云帧导出成 ASCII PCD (`--write-pcd`)
 
+## ROS2 Bridge
+
+启动 bridge 后在 Foxglove 或 RViz2 中实时看点云：
+
+```bash
+colcon build --packages-select ws30_lidar_bridge
+source install/setup.bash
+ros2 launch ws30_lidar_bridge ws30_lidar.launch.py
+
+ros2 run rviz2 rviz2 -d rviz/ws30_lidar.rviz
+```
+
 ## Why Standalone First
 
 当前优先级是确认 WS30 原始数据正确，而不是先接 ROS2 UI。
@@ -50,9 +68,8 @@
 
 1. `tool_lidar_dump`
 2. raw replay / PCD export
-3. ROS2 bridge
-4. Foxglove / RViz2 可视化
-5. guidance 深度接入
+3. ROS2 bridge + RViz2 / Foxglove 可视化
+4. guidance 深度接入
 
 ## Current Raw Log Format
 
@@ -68,7 +85,6 @@ raw log 当前是自定义二进制格式：
 
 现在最合理的下一步是：
 
-1. ROS2 bridge package
-2. `PointCloud2` 发布
-3. RViz2 / Foxglove 可视化配置
-4. 再接 `GuidancePipeline`
+1. 把 WS30 深度接入 `GuidancePipeline`
+2. 相机-雷达外参标定
+3. 视觉-雷达深度融合

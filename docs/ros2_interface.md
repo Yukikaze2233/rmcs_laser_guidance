@@ -1,4 +1,4 @@
-# ROS2 Interface (Planned)
+# ROS2 Interface
 
 ## Design Rule
 
@@ -14,23 +14,37 @@ bridge 的职责固定为：
 
 ## Package Shape
 
-建议新增独立 package，例如：
+当前 bridge package 位置：
 
-- `ros2/rmcs_laser_guidance_bridge`
-- 或 `ros2/ws30_lidar_bridge`
+- `ros2/ws30_lidar_bridge/`
 
-它依赖 `rmcs_laser_guidance_core`，但不反向污染 core。
+它依赖 `rmcs_laser_guidance_core`（通过路径查找 `build/librmcs_laser_guidance_core.a`），但不反向污染 core。
+
+先编译 standalone core，再 colcon build bridge：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWITH_FT4222=OFF
+cmake --build build --parallel
+cd ros2/ws30_lidar_bridge
+colcon build --packages-select ws30_lidar_bridge
+```
 
 ## Topics
 
-建议 topic：
+当前实际 topic（namespace 下）：
+
+- `~/points`
+  - `sensor_msgs/msg/PointCloud2`
+- `~/imu`
+  - `sensor_msgs/msg/Imu`
+- `~/status`
+  - `diagnostic_msgs/msg/DiagnosticArray`
+
+节点 namespace 为 `/gimbal/laser_guidance/ws30`，完整路径：
 
 - `/gimbal/laser_guidance/ws30/points`
-  - `sensor_msgs/msg/PointCloud2`
 - `/gimbal/laser_guidance/ws30/imu`
-  - `sensor_msgs/msg/Imu`
 - `/gimbal/laser_guidance/ws30/status`
-  - `diagnostic_msgs/msg/DiagnosticArray`
 
 ## Parameters
 
@@ -45,17 +59,31 @@ bridge 的职责固定为：
 
 ## Services
 
-建议只保留一个最小 service：
-
-- `/gimbal/laser_guidance/ws30/reopen`
+- `~/reopen`
   - `std_srvs/srv/Trigger`
+
+## Running
+
+```bash
+source install/setup.bash
+ros2 launch ws30_lidar_bridge ws30_lidar.launch.py
+```
+
+自定义参数：
+
+```bash
+ros2 launch ws30_lidar_bridge ws30_lidar.launch.py device_ip:=192.168.1.100 publish_imu:=false
+```
 
 ## Visualization
 
-点云查看建议支持两条路径：
+点云查看支持两条路径：
 
-1. Foxglove
-2. RViz2
+1. Foxglove — 直接连接 ROS2，订阅 `PointCloud2`
+2. RViz2 — 使用预置配置：
+   ```bash
+   ros2 run rviz2 rviz2 -d rviz/ws30_lidar.rviz
+   ```
 
 两者都消费标准 `PointCloud2`。
 

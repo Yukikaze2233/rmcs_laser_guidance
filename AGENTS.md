@@ -53,6 +53,12 @@
   - 跟踪/状态模块：`EkfTracker`、`HitState`、`HitProgress`、`FreshnessQueue`、`RuntimeMetrics`。
 - `src/io/`
   - 硬件 I/O 模块：`Ft4222Spi`、LibFT4222 头文件。
+- `external/`
+  - git submodules：`ws30_lidar_core`（WS30 standalone 雷达库）。
+- `ros2/`
+  - ROS2 bridge packages：`ws30_lidar_bridge`（WS30 → PointCloud2/Imu）。
+- `rviz/`
+  - 预置 RViz2 可视化配置。
 - `tools/`
   - 可执行工具入口（原 `examples/`），包括 WS30 调试入口 `tool_lidar_dump`。
 - `tests/`
