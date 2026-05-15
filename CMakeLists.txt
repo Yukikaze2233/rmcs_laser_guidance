@@ -90,7 +90,11 @@ endif()
 
 set(COMMON_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/ws30_lidar_core/include)
+
+# ---- WS30 lidar core (submodule) ------------------------------------------------
+add_subdirectory(external/ws30_lidar_core EXCLUDE_FROM_ALL)
 
 set(DEFAULT_PATH_DEFS
   RMCS_LASER_GUIDANCE_DEFAULT_CONFIG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/config/default.yaml"
@@ -101,7 +105,7 @@ set(DEFAULT_PATH_DEFS
 add_library(rmcs_laser_guidance_core ${ALL_SOURCES})
 target_include_directories(rmcs_laser_guidance_core PUBLIC ${COMMON_INCLUDES})
 target_compile_definitions(rmcs_laser_guidance_core PRIVATE ${DEFAULT_PATH_DEFS})
-target_link_libraries(rmcs_laser_guidance_core PUBLIC ${COMMON_LIBS})
+target_link_libraries(rmcs_laser_guidance_core PUBLIC ${COMMON_LIBS} ws30_lidar_core)
 if(WITH_ONNXRUNTIME)
   target_link_libraries(rmcs_laser_guidance_core PUBLIC onnxruntime::onnxruntime)
 endif()

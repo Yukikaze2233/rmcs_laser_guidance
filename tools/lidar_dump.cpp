@@ -7,30 +7,30 @@
 #include <string>
 #include <string_view>
 
-#include "capture/ws30_capture_log.hpp"
-#include "capture/ws30_client.hpp"
-#include "capture/ws30_frame_assembler.hpp"
-#include "capture/ws30_packet_parser.hpp"
-#include "capture/ws30_pcd_writer.hpp"
-#include "io/ws30_udp.hpp"
+#include "ws30_lidar/capture_log.hpp"
+#include "ws30_lidar/client.hpp"
+#include "ws30_lidar/frame_assembler.hpp"
+#include "ws30_lidar/packet_parser.hpp"
+#include "ws30_lidar/pcd_writer.hpp"
+#include "ws30_lidar/udp.hpp"
 
 namespace {
 
-using rmcs_laser_guidance::Ws30Client;
-using rmcs_laser_guidance::Ws30ClientConfig;
-using rmcs_laser_guidance::Ws30DeviceInfo;
-using rmcs_laser_guidance::Ws30ImuSample;
-using rmcs_laser_guidance::Ws30Packet;
-using rmcs_laser_guidance::Ws30PacketKind;
-using rmcs_laser_guidance::Ws30PacketParser;
-using rmcs_laser_guidance::Ws30PointFrame;
-using rmcs_laser_guidance::Ws30RawLogEntry;
-using rmcs_laser_guidance::Ws30RawLogReader;
-using rmcs_laser_guidance::Ws30RawLogWriter;
-using rmcs_laser_guidance::Ws30StreamKind;
-using rmcs_laser_guidance::Ws30UdpConfig;
-using rmcs_laser_guidance::Ws30UdpSocket;
-using rmcs_laser_guidance::write_ws30_frame_as_pcd;
+using ws30_lidar::Client;
+using ws30_lidar::ClientConfig;
+using ws30_lidar::DeviceInfo;
+using ws30_lidar::ImuSample;
+using ws30_lidar::Packet;
+using ws30_lidar::PacketKind;
+using ws30_lidar::PacketParser;
+using ws30_lidar::PointFrame;
+using ws30_lidar::RawLogEntry;
+using ws30_lidar::RawLogReader;
+using ws30_lidar::RawLogWriter;
+using ws30_lidar::StreamKind;
+using ws30_lidar::UdpConfig;
+using ws30_lidar::UdpSocket;
+using ws30_lidar::write_frame_as_pcd;
 
 struct Options {
     std::string device_ip = "192.168.137.200";
@@ -171,7 +171,7 @@ auto parse_options(int argc, char** argv) -> std::optional<Options> {
     return options;
 }
 
-auto print_points_frame(const Ws30PointFrame& frame) -> void {
+auto print_points_frame(const PointFrame& frame) -> void {
     if (frame.points.empty()) {
         std::println("points frame ts={}ms count=0", frame.timestamp_ms);
         return;
@@ -188,7 +188,7 @@ auto print_points_frame(const Ws30PointFrame& frame) -> void {
                  first.ring);
 }
 
-auto print_imu_sample(const Ws30ImuSample& imu) -> void {
+auto print_imu_sample(const ImuSample& imu) -> void {
     std::println("imu ts={}ms gyro=({:.3f},{:.3f},{:.3f}) acc=({:.3f},{:.3f},{:.3f})",
                  imu.timestamp_ms,
                  imu.gyro_x,
@@ -199,8 +199,8 @@ auto print_imu_sample(const Ws30ImuSample& imu) -> void {
                  imu.acc_z);
 }
 
-auto to_imu_sample(const rmcs_laser_guidance::Ws30ImuPacket& packet) -> Ws30ImuSample {
-    return Ws30ImuSample{
+auto to_imu_sample(const ws30_lidar::ImuPacket& packet) -> ImuSample {
+    return ImuSample{
         .timestamp_ms = packet.timestamp_ms,
         .gyro_x = packet.gyro_x,
         .gyro_y = packet.gyro_y,
@@ -211,7 +211,7 @@ auto to_imu_sample(const rmcs_laser_guidance::Ws30ImuPacket& packet) -> Ws30ImuS
     };
 }
 
-auto print_device_info(const Ws30DeviceInfo& info) -> void {
+auto print_device_info(const DeviceInfo& info) -> void {
     if (info.serial_number.has_value()) {
         std::println("status serial-number '{}'", *info.serial_number);
     }
@@ -236,12 +236,12 @@ auto make_pcd_path(const std::filesystem::path& dir,
 }
 
 auto maybe_write_pcd(const Options& options,
-                     const Ws30PointFrame& frame,
+                     const PointFrame& frame,
                      int& written_frames) -> void {
     if (options.write_pcd_dir.empty()) return;
     if (options.max_pcd_frames >= 0 && written_frames >= options.max_pcd_frames) return;
     const auto path = make_pcd_path(options.write_pcd_dir, frame.timestamp_ms, written_frames);
-    if (auto result = write_ws30_frame_as_pcd(path, frame); !result) {
+    if (auto result = write_frame_as_pcd(path, frame); !result) {
         std::println(stderr, "tool_lidar_dump: failed to write PCD '{}': {}", path.string(), result.error());
         return;
     }
@@ -249,53 +249,53 @@ auto maybe_write_pcd(const Options& options,
     std::println("tool_lidar_dump: wrote PCD {}", path.string());
 }
 
-auto handle_points_packet(const Ws30Packet& packet,
-                          rmcs_laser_guidance::Ws30FrameAssembler& assembler,
+auto handle_points_packet(const Packet& packet,
+                          ws30_lidar::FrameAssembler& assembler,
                           const Options& options,
                           int& written_frames) -> void {
-    const auto& points = std::get<rmcs_laser_guidance::Ws30PointsPacket>(packet.data);
+    const auto& points = std::get<ws30_lidar::PointsPacket>(packet.data);
     if (auto frame = assembler.push(points); frame) {
         print_points_frame(*frame);
         maybe_write_pcd(options, *frame, written_frames);
     }
 }
 
-auto handle_replay_entry(const Ws30RawLogEntry& entry,
-                         rmcs_laser_guidance::Ws30FrameAssembler& assembler,
+auto handle_replay_entry(const RawLogEntry& entry,
+                         ws30_lidar::FrameAssembler& assembler,
                          const Options& options,
                          int& written_frames) -> void {
-    auto parsed = Ws30PacketParser::parse(entry.payload);
+    auto parsed = PacketParser::parse(entry.payload);
     if (!parsed) {
-        std::println(stderr, "replay {} parse error: {}", rmcs_laser_guidance::ws30_stream_kind_name(entry.stream), parsed.error());
+        std::println(stderr, "replay {} parse error: {}", ws30_lidar::stream_kind_name(entry.stream), parsed.error());
         return;
     }
 
     switch (parsed->kind) {
-    case Ws30PacketKind::points:
+    case PacketKind::points:
         handle_points_packet(*parsed, assembler, options, written_frames);
         break;
-    case Ws30PacketKind::imu:
-        print_imu_sample(to_imu_sample(std::get<rmcs_laser_guidance::Ws30ImuPacket>(parsed->data)));
+    case PacketKind::imu:
+        print_imu_sample(to_imu_sample(std::get<ws30_lidar::ImuPacket>(parsed->data)));
         break;
-    case Ws30PacketKind::serial_number:
-        print_device_info(Ws30DeviceInfo{.serial_number = std::get<rmcs_laser_guidance::Ws30SerialNumberPacket>(parsed->data).serial_number});
+    case PacketKind::serial_number:
+        print_device_info(DeviceInfo{.serial_number = std::get<ws30_lidar::SerialNumberPacket>(parsed->data).serial_number});
         break;
-    case Ws30PacketKind::startup_status:
-        print_device_info(Ws30DeviceInfo{.connected = std::get<rmcs_laser_guidance::Ws30StartupStatusPacket>(parsed->data).connected});
+    case PacketKind::startup_status:
+        print_device_info(DeviceInfo{.connected = std::get<ws30_lidar::StartupStatusPacket>(parsed->data).connected});
         break;
-    case Ws30PacketKind::unknown:
-        std::println("replay {} unknown packet", rmcs_laser_guidance::ws30_stream_kind_name(entry.stream));
+    case PacketKind::unknown:
+        std::println("replay {} unknown packet", ws30_lidar::stream_kind_name(entry.stream));
         break;
     }
 }
 
 auto run_replay(const Options& options) -> int {
-    auto reader = Ws30RawLogReader::open(options.replay_path);
+    auto reader = RawLogReader::open(options.replay_path);
     if (!reader) {
         std::println(stderr, "tool_lidar_dump: failed to open replay file: {}", reader.error());
         return 1;
     }
-    rmcs_laser_guidance::Ws30FrameAssembler assembler;
+    ws30_lidar::FrameAssembler assembler;
     int processed = 0;
     int written_frames = 0;
     while (options.iterations <= 0 || processed < options.iterations) {
@@ -311,14 +311,14 @@ auto run_replay(const Options& options) -> int {
     return 0;
 }
 
-auto receive_and_record(Ws30UdpSocket& socket,
-                        Ws30StreamKind stream,
-                        Ws30RawLogWriter* writer,
+auto receive_and_record(UdpSocket& socket,
+                        StreamKind stream,
+                        RawLogWriter* writer,
                         std::array<std::byte, 4096>& buffer)
-    -> std::expected<std::optional<Ws30Packet>, std::string> {
+    -> std::expected<std::optional<Packet>, std::string> {
     const auto received = socket.receive(buffer);
     if (!received) {
-        if (received.error().contains("Resource temporarily unavailable")) return std::optional<Ws30Packet>{};
+        if (received.error().contains("Resource temporarily unavailable")) return std::optional<Packet>{};
         return std::unexpected(received.error());
     }
     if (writer != nullptr) {
@@ -326,28 +326,28 @@ auto receive_and_record(Ws30UdpSocket& socket,
             return std::unexpected(append.error());
         }
     }
-    auto parsed = Ws30PacketParser::parse(std::span<const std::byte>(buffer.data(), *received));
+    auto parsed = PacketParser::parse(std::span<const std::byte>(buffer.data(), *received));
     if (!parsed) return std::unexpected(parsed.error());
-    return std::optional<Ws30Packet>(std::move(parsed.value()));
+    return std::optional<Packet>(std::move(parsed.value()));
 }
 
 auto run_live_with_recording(const Options& options) -> int {
-    auto points = Ws30UdpSocket::open(Ws30UdpConfig{.remote_address = options.device_ip, .remote_port = options.points_port, .receive_timeout_ms = options.timeout_ms});
+    auto points = UdpSocket::open(UdpConfig{.remote_address = options.device_ip, .remote_port = options.points_port, .receive_timeout_ms = options.timeout_ms});
     if (!points) {
         std::println(stderr, "tool_lidar_dump: failed to open points socket: {}", points.error());
         return 1;
     }
-    auto imu = Ws30UdpSocket::open(Ws30UdpConfig{.remote_address = options.device_ip, .remote_port = options.imu_port, .receive_timeout_ms = options.timeout_ms});
+    auto imu = UdpSocket::open(UdpConfig{.remote_address = options.device_ip, .remote_port = options.imu_port, .receive_timeout_ms = options.timeout_ms});
     if (!imu) {
         std::println(stderr, "tool_lidar_dump: failed to open imu socket: {}", imu.error());
         return 1;
     }
-    auto status = Ws30UdpSocket::open(Ws30UdpConfig{.remote_address = options.device_ip, .remote_port = options.status_port, .receive_timeout_ms = options.timeout_ms});
+    auto status = UdpSocket::open(UdpConfig{.remote_address = options.device_ip, .remote_port = options.status_port, .receive_timeout_ms = options.timeout_ms});
     if (!status) {
         std::println(stderr, "tool_lidar_dump: failed to open status socket: {}", status.error());
         return 1;
     }
-    auto writer = Ws30RawLogWriter::open(options.record_raw_path);
+    auto writer = RawLogWriter::open(options.record_raw_path);
     if (!writer) {
         std::println(stderr, "tool_lidar_dump: failed to open raw log writer: {}", writer.error());
         return 1;
@@ -357,7 +357,7 @@ auto run_live_with_recording(const Options& options) -> int {
     if (options.request_imu) log_command_error("request imu", imu->send_text("hello,imu"));
     log_command_error("request serial number", status->send_text("sn"));
 
-    rmcs_laser_guidance::Ws30FrameAssembler assembler;
+    ws30_lidar::FrameAssembler assembler;
     std::array<std::byte, 4096> points_buffer{};
     std::array<std::byte, 4096> imu_buffer{};
     std::array<std::byte, 4096> status_buffer{};
@@ -365,25 +365,25 @@ auto run_live_with_recording(const Options& options) -> int {
 
     for (int i = 0; i < options.iterations; ++i) {
         if (options.request_points) {
-            auto packet = receive_and_record(*points, Ws30StreamKind::points, &*writer, points_buffer);
+            auto packet = receive_and_record(*points, StreamKind::points, &*writer, points_buffer);
             if (!packet) std::println(stderr, "points: {}", packet.error());
             else if (packet->has_value()) handle_points_packet(**packet, assembler, options, written_frames);
             else std::println(stderr, "points: timeout waiting for packet");
         }
         if (options.request_imu) {
-            auto packet = receive_and_record(*imu, Ws30StreamKind::imu, &*writer, imu_buffer);
+            auto packet = receive_and_record(*imu, StreamKind::imu, &*writer, imu_buffer);
             if (!packet) std::println(stderr, "imu: {}", packet.error());
-            else if (packet->has_value() && (*packet)->kind == Ws30PacketKind::imu)
-                print_imu_sample(to_imu_sample(std::get<rmcs_laser_guidance::Ws30ImuPacket>((*packet)->data)));
+            else if (packet->has_value() && (*packet)->kind == PacketKind::imu)
+                print_imu_sample(to_imu_sample(std::get<ws30_lidar::ImuPacket>((*packet)->data)));
             else std::println(stderr, "imu: timeout waiting for packet");
         }
-        auto info = receive_and_record(*status, Ws30StreamKind::status, &*writer, status_buffer);
+        auto info = receive_and_record(*status, StreamKind::status, &*writer, status_buffer);
         if (!info) std::println(stderr, "status: {}", info.error());
         else if (info->has_value()) {
-            if ((*info)->kind == Ws30PacketKind::serial_number)
-                print_device_info(Ws30DeviceInfo{.serial_number = std::get<rmcs_laser_guidance::Ws30SerialNumberPacket>((*info)->data).serial_number});
-            else if ((*info)->kind == Ws30PacketKind::startup_status)
-                print_device_info(Ws30DeviceInfo{.connected = std::get<rmcs_laser_guidance::Ws30StartupStatusPacket>((*info)->data).connected});
+            if ((*info)->kind == PacketKind::serial_number)
+                print_device_info(DeviceInfo{.serial_number = std::get<ws30_lidar::SerialNumberPacket>((*info)->data).serial_number});
+            else if ((*info)->kind == PacketKind::startup_status)
+                print_device_info(DeviceInfo{.connected = std::get<ws30_lidar::StartupStatusPacket>((*info)->data).connected});
         } else std::println(stderr, "status: timeout waiting for packet");
     }
 
@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
         if (!options->replay_path.empty()) return run_replay(*options);
         if (!options->record_raw_path.empty()) return run_live_with_recording(*options);
 
-        Ws30Client client(Ws30ClientConfig{
+        Client client(ClientConfig{
             .device_ip = options->device_ip,
             .points_port = options->points_port,
             .imu_port = options->imu_port,
