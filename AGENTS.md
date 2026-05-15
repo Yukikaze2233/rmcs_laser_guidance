@@ -16,6 +16,7 @@
 - 自动测试与工具运行入口
 - 比赛模式统一守护进程 `tool_competition`（预览+引导+录制融合）
 - ONNX + TensorRT 双推理后端，运行时热切换
+- WS30 雷达 standalone scaffold：`Ws30UdpSocket` / `Ws30PacketParser` / `Ws30FrameAssembler` / `Ws30Client` / `tool_lidar_dump`
 
 当前明确**不是**闭环控制系统，不包含：
 
@@ -45,7 +46,7 @@
 - `src/vision/`
   - 视觉/推理模块：`Detector`、`ModelInfer`、`ModelRuntime`、`ModelAdapter`、`TensorRTEngine`、`TrainingData`。
 - `src/capture/`
-  - 视频采集模块：`V4l2Capture`。
+  - 视频采集与雷达协议模块：`V4l2Capture`、WS30 packet parser / frame assembler / client。
 - `src/streaming/`
   - 网络推流模块：`RtpStreamer`、`UdpSender`、`VideoShm`。
 - `src/tracking/`
@@ -53,7 +54,7 @@
 - `src/io/`
   - 硬件 I/O 模块：`Ft4222Spi`、LibFT4222 头文件。
 - `tools/`
-  - 可执行工具入口（原 `examples/`）。
+  - 可执行工具入口（原 `examples/`），包括 WS30 调试入口 `tool_lidar_dump`。
 - `tests/`
   - 自动化验证，按模块分子目录（`core/`、`vision/`、`tracking/`），文件名统一为 `*_test.cpp`。
 - `test_data/`
@@ -119,6 +120,13 @@ V4l2Capture / synthetic frame / replay frame
 -> HitProgress (lock-progress, 3-stage P0)
 -> RtpStreamer (RTP + ffplay) / UdpSender / VideoShmProducer
 -> VideoSessionRecorder (optional, FIFO toggle)
+
+WS30 device (UDP)
+-> Ws30UdpSocket
+-> Ws30PacketParser
+-> Ws30FrameAssembler
+-> Ws30Client
+-> tool_lidar_dump
 ```
 
 ### 比赛模式入口
@@ -187,6 +195,7 @@ rmcs_laser_guidance_core
    / renderer / replay / v4l2 / rtp_streamer / udp_sender / video_shm
    / ekf_tracker / hit_state / hit_progress / freshness_queue / runtime_metrics
    / ft4222_spi / guidance_pipeline / voltage_mapper / galvo_driver / galvo_kinematics
+   / ws30_packet_parser / ws30_frame_assembler / ws30_client / ws30_udp
    / camera_projection / depth_estimator / pipeline
 
 tool_*
@@ -251,6 +260,7 @@ bridge 不应承载算法实现本身。
 以下内容不应在这个阶段偷偷引入：
 
 - `/tf`
+- ROS2 bridge 业务逻辑直接进入 core
 - `HardSyncSnapshot`
 - `tracker`
 - `solver`
