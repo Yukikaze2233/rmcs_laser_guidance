@@ -125,6 +125,12 @@ WS30 雷达调试：
 
 # 联机请求点云/IMU/SN（无设备时可用于验证超时路径）
 ./build/tool_lidar_dump --device-ip 192.168.137.200 --iterations 10
+
+# 录制 WS30 原始包
+./build/tool_lidar_dump --device-ip 192.168.137.200 --iterations 100 --record-raw /tmp/ws30.rawlog
+
+# 回放原始包并导出 PCD
+./build/tool_lidar_dump --replay /tmp/ws30.rawlog --write-pcd /tmp/ws30_pcd
 ```
 
 ## Quick Scripts

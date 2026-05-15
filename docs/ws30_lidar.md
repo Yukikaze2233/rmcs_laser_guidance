@@ -19,8 +19,6 @@
 
 当前**尚未实现**：
 
-- raw 包录制/回放
-- PCD / PLY 导出
 - ROS2 `PointCloud2` 发布
 - 与 `GuidancePipeline` 的深度融合
 
@@ -29,6 +27,8 @@
 ```bash
 ./build/tool_lidar_dump --help
 ./build/tool_lidar_dump --device-ip 192.168.137.200 --iterations 10
+./build/tool_lidar_dump --device-ip 192.168.137.200 --iterations 100 --record-raw /tmp/ws30.rawlog
+./build/tool_lidar_dump --replay /tmp/ws30.rawlog --write-pcd /tmp/ws30_pcd
 ```
 
 当前 CLI 会：
@@ -38,6 +38,9 @@
 - 打印 imu 摘要
 - 打印 status / serial number 摘要
 - 在无设备时清晰打印 timeout
+- 录制 WS30 原始 UDP payload (`--record-raw`)
+- 从 raw log 回放 (`--replay`)
+- 将完整点云帧导出成 ASCII PCD (`--write-pcd`)
 
 ## Why Standalone First
 
@@ -46,17 +49,26 @@
 所以调试顺序应固定为：
 
 1. `tool_lidar_dump`
-2. raw replay / PCD export（下一步）
+2. raw replay / PCD export
 3. ROS2 bridge
 4. Foxglove / RViz2 可视化
 5. guidance 深度接入
 
-## Planned Next Step
+## Current Raw Log Format
 
-下一步优先补：
+raw log 当前是自定义二进制格式：
 
-- `--record-raw <file>`
-- `--replay <file>`
-- `--write-pcd <dir>`
+- 文件头：`WS30LOG1`
+- entry header：`stream_kind + capture_unix_ns + payload_size`
+- payload：WS30 原始 UDP datagram
 
 这样可以把设备问题、parser 问题、bridge 问题分开排查。
+
+## Current Next Step
+
+现在最合理的下一步是：
+
+1. ROS2 bridge package
+2. `PointCloud2` 发布
+3. RViz2 / Foxglove 可视化配置
+4. 再接 `GuidancePipeline`
