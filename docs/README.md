@@ -12,6 +12,10 @@
   - 说明 `FT4222 USB-to-SPI` 到 `DAC8568 ±10V` 模块的供电、接线、SPI 时序与最小联调流程。
 - `future_rmcs_integration.md`
   - 说明后续若接入 RMCS，应如何逐步增加 bridge、姿态和控制接口。
+- `ws30_lidar.md`
+  - 说明 WS30 当前 standalone scaffold、CLI 调试方式、后续 raw 录制/回放与点云导出计划。
+- `ros2_interface.md`
+  - 说明 WS30 后续 ROS2 bridge 的 topic / param / service 设计与可视化调试约定。
 
 推荐阅读顺序：
 
@@ -21,3 +25,5 @@
 4. `dataset_collection.md`
 5. `development.md`
 6. `future_rmcs_integration.md`
+7. `ws30_lidar.md`
+8. `ros2_interface.md`

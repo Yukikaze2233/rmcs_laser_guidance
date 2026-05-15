@@ -15,6 +15,7 @@
 - 空中机器人被瞄准进度计算 (`HitProgress`，RoboMaster 2026 §5.6.3)
 - EKF 跟踪（可运行时关闭，切换原始检测直驱）
 - 敌方颜色过滤（red/blue/auto）
+- WS30 激光雷达 standalone scaffold（UDP 收包、协议解析、点云组帧、CLI 调试入口）
 
 当前阶段**不包含**：
 
@@ -74,6 +75,7 @@ ctest --test-dir build --output-on-failure
 ./build/tool_export                  # 离线抽帧导出
 ./build/tool_transcode               # 已录视频转码
 ./build/tool_smoke                   # 离线冒烟
+./build/tool_lidar_dump              # WS30 雷达原始收包/解析调试
 ```
 
 大部分工具接受可选的配置文件路径：
@@ -115,6 +117,16 @@ ctest --test-dir build --output-on-failure
 ./build/tool_transcode /path/to/videos/<session_id>
 ```
 
+WS30 雷达调试：
+
+```bash
+# 查看 CLI 参数
+./build/tool_lidar_dump --help
+
+# 联机请求点云/IMU/SN（无设备时可用于验证超时路径）
+./build/tool_lidar_dump --device-ip 192.168.137.200 --iterations 10
+```
+
 ## Quick Scripts
 
 ```bash
@@ -150,7 +162,7 @@ laser_guidance/
 ├── src/
 │   ├── core/              # 核心模块
 │   ├── vision/            # 检测/推理模块
-│   ├── capture/           # 视频采集 (V4L2)
+│   ├── capture/           # 视频采集 / WS30 雷达协议与组帧
 │   ├── streaming/         # 网络推流 (RTP/UDP/SHM)
 │   ├── tracking/          # EKF 跟踪
 │   └── io/                # 硬件 I/O (FT4222H 等)
@@ -241,6 +253,8 @@ if (spi) {
 - 录制输出 `raw.mp4 + session.yaml + notes.txt`，默认 H.264/avc1 编码
 - RTP 推流：`make stream` 后台 daemon + ffplay 窗口，关闭即停。`streaming` 配置段控制，默认端口 5004
 - `.script/` 提供便捷脚本：`set-config`、`scan-camera`、`preview`、`stream`、`stop`
+- WS30 当前只实现 standalone core：`Ws30UdpSocket` / `Ws30PacketParser` / `Ws30FrameAssembler` / `Ws30Client`
+- WS30 当前调试路径优先使用 `tool_lidar_dump`；ROS2 bridge、RViz/Foxglove 可视化和 PCD 导出是下一步
 
 ## Docs
 
@@ -250,3 +264,5 @@ if (spi) {
 - `docs/dataset_collection.md`
 - `docs/development.md`
 - `docs/future_rmcs_integration.md`
+- `docs/ws30_lidar.md`
+- `docs/ros2_interface.md`
